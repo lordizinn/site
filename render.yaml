@@ -1,10 +1,17 @@
 services:
-  # Backend API Service
+  # Full-stack service (Backend API + Frontend)
   - type: web
     name: aviator-analytics-api
     runtime: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
+    buildCommand: |
+      # Install backend dependencies
+      pip install -r backend/requirements.txt
+      # Build frontend (Render has Node.js pre-installed)
+      cd frontend
+      yarn install --frozen-lockfile
+      yarn build
+      cd ..
     startCommand: uvicorn backend.server:app --host 0.0.0.0 --port 10000
     envVars:
       # DATABASE_URL is auto-configured to use absolute path in backend/data/
@@ -25,5 +32,5 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "*"
-    healthCheckPath: /
+    healthCheckPath: /health
     autoDeploy: true

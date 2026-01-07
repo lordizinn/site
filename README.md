@@ -93,21 +93,32 @@ By default, the application uses SQLite with an auto-configured absolute path: `
 
 ## Deployment on Render
 
-### Option 1: Using render.yaml (Blueprint)
+This application can be deployed as a **full-stack service** (frontend + backend together) on Render.
+
+### Using render.yaml (Blueprint) - Recommended
 
 1. Fork or push this repository to GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com/)
 3. Click "New" → "Blueprint"
 4. Connect your GitHub repository
-5. Render will automatically detect `render.yaml` and create the service
+5. Render will automatically:
+   - Install Python backend dependencies
+   - Build the React frontend
+   - Deploy both together on a single service
 6. Configure the required environment variables in the Render dashboard:
    - `JWT_SECRET` - Generate a secure random string
    - `MERCADO_PAGO_ACCESS_TOKEN` - Your Mercado Pago access token
    - `RESEND_API_KEY` - Your Resend API key
-   - `FRONTEND_URL` - Your frontend URL
-   - `CORS_ORIGINS` - Allowed origins (e.g., your frontend domain)
+   - `CORS_ORIGINS` - Can be "*" since frontend is served from same origin
 
-### Option 2: Manual Setup
+### How It Works
+
+- **Frontend**: The React app is built during deployment and served as static files from the root path (`/`)
+- **Backend API**: All API endpoints are available under `/api/*`
+- **Single URL**: Everything is accessible from one URL (e.g., `https://your-app.onrender.com`)
+- **SPA Routing**: The backend serves `index.html` for all non-API routes to support React Router
+
+### Manual Setup (Alternative)
 
 1. Go to [Render Dashboard](https://dashboard.render.com/)
 2. Click "New" → "Web Service"
@@ -115,7 +126,10 @@ By default, the application uses SQLite with an auto-configured absolute path: `
 4. Configure the service:
    - **Name:** aviator-analytics-api
    - **Runtime:** Python
-   - **Build Command:** `pip install -r backend/requirements.txt`
+   - **Build Command:** 
+     ```bash
+     pip install -r backend/requirements.txt && cd frontend && yarn install --frozen-lockfile && yarn build && cd ..
+     ```
    - **Start Command:** `uvicorn backend.server:app --host 0.0.0.0 --port 10000`
    - **Plan:** Free (or your preferred plan)
 5. Add environment variables (see table above)
@@ -124,20 +138,23 @@ By default, the application uses SQLite with an auto-configured absolute path: `
 ### Important Render Configuration
 
 - **Port:** The application runs on port 10000 (Render's default)
-- **Health Check:** Optional - can use `/api/dashboard/stats` (requires auth) or create a dedicated health endpoint
+- **Health Check:** Uses `/health` endpoint
 - **Auto-Deploy:** Enable to automatically deploy on git push
+- **Node.js:** Pre-installed on Render Python environments for building the frontend
 
 ### Post-Deployment
 
 After deployment:
-1. Note your Render service URL (e.g., `https://aviator-analytics-api.onrender.com`)
-2. Update `FRONTEND_URL` in environment variables if deploying frontend separately
-3. Configure Mercado Pago webhook URL to point to: `https://your-service.onrender.com/api/webhooks/mercado-pago`
+1. Your service will be available at one URL (e.g., `https://aviator-analytics-api.onrender.com`)
+2. Frontend UI is accessible at the root: `https://aviator-analytics-api.onrender.com/`
+3. API endpoints: `https://aviator-analytics-api.onrender.com/api/*`
+4. API docs: `https://aviator-analytics-api.onrender.com/docs`
+5. Configure Mercado Pago webhook URL to point to: `https://your-service.onrender.com/api/webhooks/mercado-pago`
 
 ## API Documentation
 
 Once running, visit:
-- Root endpoint: `http://localhost:8000/` - API info and status
+- Root endpoint: `http://localhost:8000/` - Serves the React frontend UI (or API info if frontend not built)
 - API docs (Swagger): `http://localhost:8000/docs`
 - Alternative docs (ReDoc): `http://localhost:8000/redoc`
 

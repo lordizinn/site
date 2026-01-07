@@ -1,5 +1,7 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Field, create_engine, select
@@ -87,25 +89,55 @@ app = FastAPI(title="Aviator Analytics Pro API", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
-# Root endpoint - welcome and health check
-@app.get("/")
-@app.head("/")
-async def root():
-    return {
-        "service": "Aviator Analytics Pro API",
-        "status": "healthy",
-        "version": "1.0.0",
-        "endpoints": {
-            "health": "/health",
-            "api": "/api",
-            "docs": "/docs"
-        }
-    }
+# Setup static files and frontend serving
+FRONTEND_BUILD_DIR = ROOT_DIR.parent / 'frontend' / 'build'
 
-# Health check endpoint (no auth required)
+# Health check endpoint (no auth required) - must be before static files
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Mount static files if frontend build exists
+if FRONTEND_BUILD_DIR.exists():
+    # Mount static directory for assets
+    static_dir = FRONTEND_BUILD_DIR / 'static'
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    
+    # Serve index.html for root and any non-API routes (SPA routing)
+    @app.get("/")
+    async def serve_frontend_root():
+        return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Don't catch API routes, health, or docs
+        if full_path.startswith(("api/", "health", "docs", "redoc", "openapi.json")):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Check if file exists in build directory
+        file_path = FRONTEND_BUILD_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        
+        # For SPA routing, serve index.html for all other paths
+        return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))
+else:
+    # Fallback if frontend not built - show API info
+    @app.get("/")
+    @app.head("/")
+    async def root():
+        return {
+            "service": "Aviator Analytics Pro API",
+            "status": "healthy",
+            "version": "1.0.0",
+            "endpoints": {
+                "health": "/health",
+                "api": "/api",
+                "docs": "/docs"
+            },
+            "note": "Frontend not built. Run 'cd frontend && npm run build' to enable frontend serving."
+        }
 
 # SQLModel Models
 class User(SQLModel, table=True):

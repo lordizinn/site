@@ -87,6 +87,21 @@ app = FastAPI(title="Aviator Analytics Pro API", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
+# Root endpoint - welcome and health check
+@app.get("/")
+@app.head("/")
+async def root():
+    return {
+        "service": "Aviator Analytics Pro API",
+        "status": "healthy",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "api": "/api",
+            "docs": "/docs"
+        }
+    }
+
 # Health check endpoint (no auth required)
 @app.get("/health")
 async def health_check():

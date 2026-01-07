@@ -137,11 +137,14 @@ After deployment:
 ## API Documentation
 
 Once running, visit:
+- Root endpoint: `http://localhost:8000/` - API info and status
 - API docs (Swagger): `http://localhost:8000/docs`
 - Alternative docs (ReDoc): `http://localhost:8000/redoc`
 
 ### Main Endpoints
 
+- `GET /` - API info and health status
+- `GET /health` - Simple health check
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - User login
 - `POST /api/subscription/create-preference` - Create Mercado Pago subscription

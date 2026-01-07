@@ -25,5 +25,5 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "*"
-    healthCheckPath: /health
+    healthCheckPath: /
     autoDeploy: true

@@ -104,23 +104,9 @@ if FRONTEND_BUILD_DIR.exists():
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     
-    # Serve index.html for root and any non-API routes (SPA routing)
+    # Serve index.html for root
     @app.get("/")
     async def serve_frontend_root():
-        return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))
-    
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        # Don't catch API routes, health, or docs
-        if full_path.startswith(("api/", "health", "docs", "redoc", "openapi.json")):
-            raise HTTPException(status_code=404, detail="Not found")
-        
-        # Check if file exists in build directory
-        file_path = FRONTEND_BUILD_DIR / full_path
-        if file_path.is_file():
-            return FileResponse(str(file_path))
-        
-        # For SPA routing, serve index.html for all other paths
         return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))
 else:
     # Fallback if frontend not built - show API info
@@ -615,6 +601,19 @@ async def get_period_metrics(period: str = "day", user = Depends(get_current_use
     return {"period": period, "metrics": metrics}
 
 app.include_router(api_router)
+
+# SPA catch-all route - MUST be after API router to not intercept API routes
+if FRONTEND_BUILD_DIR.exists():
+    @app.get("/{full_path:path}")
+    async def serve_frontend_spa(full_path: str):
+        """Catch-all route for SPA - serves files or index.html for client-side routing"""
+        # Check if it's a file in the build directory
+        file_path = FRONTEND_BUILD_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        
+        # For all other paths (SPA routes), serve index.html
+        return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))
 
 app.add_middleware(
     CORSMiddleware,

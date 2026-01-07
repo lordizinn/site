@@ -26,8 +26,13 @@ DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db
 
 # Create data directory if using SQLite
 if 'sqlite' in DATABASE_URL:
-    data_dir = ROOT_DIR / 'data'
-    data_dir.mkdir(exist_ok=True)
+    # Extract the path from the DATABASE_URL
+    if ':///' in DATABASE_URL:
+        db_path = DATABASE_URL.split(':///', 1)[1]
+        if db_path.startswith('./'):
+            db_path = db_path[2:]
+        db_dir = ROOT_DIR / Path(db_path).parent
+        db_dir.mkdir(parents=True, exist_ok=True)
 
 # Create async engine
 engine = create_async_engine(

@@ -67,9 +67,28 @@ if resend_api_key:
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
-app = FastAPI(title="Aviator Analytics Pro API")
+# Initialize database on startup
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    logging.info("Database initialized")
+    yield
+    # Shutdown
+    await engine.dispose()
+    logging.info("Database connection closed")
+
+app = FastAPI(title="Aviator Analytics Pro API", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
+
+# Health check endpoint (no auth required)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 # SQLModel Models
 class User(SQLModel, table=True):
@@ -226,8 +245,13 @@ async def register(user: UserRegister, session: AsyncSession = Depends(get_sessi
         created_at=datetime.now(timezone.utc).isoformat()
     )
     
-    session.add(user_doc)
-    await session.commit()
+    try:
+        session.add(user_doc)
+        await session.commit()
+    except Exception as e:
+        await session.rollback()
+        logging.error(f"Failed to register user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register user")
     
     token = create_jwt_token(user_id, user.email)
     
@@ -281,8 +305,13 @@ async def create_preference(sub: SubscriptionCreate, session: AsyncSession = Dep
         expires_at=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     )
     
-    session.add(pending_pref)
-    await session.commit()
+    try:
+        session.add(pending_pref)
+        await session.commit()
+    except Exception as e:
+        await session.rollback()
+        logging.error(f"Failed to create pending preference: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create subscription preference")
     
     if mp:
         preference_data = {
@@ -385,7 +414,13 @@ async def handle_webhook(request: Request, session: AsyncSession = Depends(get_s
                 
                 # Delete pending preference
                 await session.delete(pending)
-                await session.commit()
+                
+                try:
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    logging.error(f"Failed to process webhook payment: {str(e)}")
+                    return {"status": "error", "message": "Failed to process payment"}
                 
                 # Send confirmation email
                 email_html = f"""
@@ -529,18 +564,6 @@ async def get_period_metrics(period: str = "day", user = Depends(get_current_use
         })
     
     return {"period": period, "metrics": metrics}
-
-# Initialize database on startup
-@app.on_event("startup")
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    logging.info("Database initialized")
-
-@app.on_event("shutdown")
-async def shutdown_db():
-    await engine.dispose()
-    logging.info("Database connection closed")
 
 app.include_router(api_router)
 

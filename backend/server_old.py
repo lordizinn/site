@@ -2,18 +2,19 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel, Field, create_engine, select
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
 from pathlib import Path
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
+import hmac
+import hashlib
 import mercadopago
 import random
 import resend
@@ -21,27 +22,10 @@ import resend
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Database Configuration
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db')
-
-# Create data directory if using SQLite
-if 'sqlite' in DATABASE_URL:
-    data_dir = ROOT_DIR / 'data'
-    data_dir.mkdir(exist_ok=True)
-
-# Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
-
-# Create session maker
-async_session_maker = async_sessionmaker(
-    engine, 
-    class_=AsyncSession, 
-    expire_on_commit=False
-)
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
 
 # JWT config
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
@@ -66,38 +50,7 @@ app = FastAPI(title="Aviator Analytics Pro API")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
-# SQLModel Models
-class User(SQLModel, table=True):
-    __tablename__ = "users"
-    
-    id: str = Field(primary_key=True)
-    email: str = Field(unique=True, index=True)
-    name: str
-    password_hash: str
-    subscription_status: str = Field(default="inactive")
-    created_at: str
-
-class PendingPreference(SQLModel, table=True):
-    __tablename__ = "pending_preferences"
-    
-    external_reference: str = Field(primary_key=True)
-    email: str
-    name: str
-    created_at: str
-    expires_at: str
-
-class Subscription(SQLModel, table=True):
-    __tablename__ = "subscriptions"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: str = Field(index=True)
-    status: str
-    plan_id: str
-    payment_id: str
-    created_at: str
-    next_billing_date: str
-
-# Pydantic Models for API
+# Models
 class UserRegister(BaseModel):
     email: EmailStr
     name: str
@@ -120,11 +73,6 @@ class AlertCreate(BaseModel):
 class AlertValidation(BaseModel):
     alert_id: str
     confirmed: bool
-
-# Database session dependency
-async def get_session() -> AsyncSession:
-    async with async_session_maker() as session:
-        yield session
 
 # Auth helpers
 def hash_password(password: str) -> str:
@@ -150,18 +98,10 @@ def verify_jwt_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session)
-):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     payload = verify_jwt_token(token)
-    
-    result = await session.execute(
-        select(User).where(User.id == payload['user_id'])
-    )
-    user = result.scalar_one_or_none()
-    
+    user = await db.users.find_one({"id": payload['user_id']}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -201,83 +141,64 @@ def generate_mock_multiplier():
 
 # Routes
 @api_router.post("/auth/register")
-async def register(user: UserRegister, session: AsyncSession = Depends(get_session)):
-    # Check if user exists
-    result = await session.execute(
-        select(User).where(User.email == user.email)
-    )
-    existing = result.scalar_one_or_none()
-    
+async def register(user: UserRegister):
+    existing = await db.users.find_one({"email": user.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     user_id = str(uuid.uuid4())
-    user_doc = User(
-        id=user_id,
-        email=user.email,
-        name=user.name,
-        password_hash=hash_password(user.password),
-        subscription_status="inactive",
-        created_at=datetime.now(timezone.utc).isoformat()
-    )
+    user_doc = {
+        "id": user_id,
+        "email": user.email,
+        "name": user.name,
+        "password_hash": hash_password(user.password),
+        "subscription_status": "inactive",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
     
-    session.add(user_doc)
-    await session.commit()
-    
+    await db.users.insert_one(user_doc)
     token = create_jwt_token(user_id, user.email)
     
     return {"token": token, "user_id": user_id, "email": user.email, "name": user.name}
 
 @api_router.post("/auth/login")
-async def login(credentials: UserLogin, session: AsyncSession = Depends(get_session)):
-    result = await session.execute(
-        select(User).where(User.email == credentials.email)
-    )
-    user = result.scalar_one_or_none()
-    
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    if not verify_password(credentials.password, user.password_hash):
+    if not verify_password(credentials.password, user['password_hash']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    if user.subscription_status != 'active':
+    if user.get('subscription_status') != 'active':
         raise HTTPException(status_code=403, detail="Subscription inactive. Please subscribe to access.")
     
-    token = create_jwt_token(user.id, user.email)
+    token = create_jwt_token(user['id'], user['email'])
     
     return {
         "token": token,
-        "user_id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "subscription_status": user.subscription_status
+        "user_id": user['id'],
+        "email": user['email'],
+        "name": user['name'],
+        "subscription_status": user.get('subscription_status')
     }
 
 @api_router.post("/subscription/create-preference")
-async def create_preference(sub: SubscriptionCreate, session: AsyncSession = Depends(get_session)):
-    # Check if user exists
-    result = await session.execute(
-        select(User).where(User.email == sub.email)
-    )
-    existing = result.scalar_one_or_none()
-    
+async def create_preference(sub: SubscriptionCreate):
+    existing = await db.users.find_one({"email": sub.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     external_reference = str(uuid.uuid4())
     
     # Store pending preference
-    pending_pref = PendingPreference(
-        external_reference=external_reference,
-        email=sub.email,
-        name=sub.name,
-        created_at=datetime.now(timezone.utc).isoformat(),
-        expires_at=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-    )
-    
-    session.add(pending_pref)
-    await session.commit()
+    await db.pending_preferences.insert_one({
+        "external_reference": external_reference,
+        "email": sub.email,
+        "name": sub.name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    })
     
     if mp:
         preference_data = {
@@ -324,7 +245,7 @@ async def create_preference(sub: SubscriptionCreate, session: AsyncSession = Dep
     return {"preference_id": preference_id, "external_reference": external_reference}
 
 @api_router.post("/webhooks/mercado-pago")
-async def handle_webhook(request: Request, session: AsyncSession = Depends(get_session)):
+async def handle_webhook(request: Request):
     body = await request.body()
     data = await request.json()
     
@@ -344,90 +265,69 @@ async def handle_webhook(request: Request, session: AsyncSession = Depends(get_s
             external_reference = data.get("external_reference")
         
         if payment_status == "approved":
-            result = await session.execute(
-                select(PendingPreference).where(
-                    PendingPreference.external_reference == external_reference
-                )
+            pending = await db.pending_preferences.find_one(
+                {"external_reference": external_reference},
+                {"_id": 0}
             )
-            pending = result.scalar_one_or_none()
             
             if pending:
                 user_id = str(uuid.uuid4())
                 password = str(uuid.uuid4())[:8]
                 
-                user_doc = User(
-                    id=user_id,
-                    email=pending.email,
-                    name=pending.name,
-                    password_hash=hash_password(password),
-                    subscription_status="active",
-                    created_at=datetime.now(timezone.utc).isoformat()
-                )
+                user_doc = {
+                    "id": user_id,
+                    "email": pending["email"],
+                    "name": pending["name"],
+                    "password_hash": hash_password(password),
+                    "subscription_status": "active",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
                 
-                session.add(user_doc)
+                await db.users.insert_one(user_doc)
                 
                 next_billing = datetime.now(timezone.utc) + timedelta(days=30)
-                subscription_doc = Subscription(
-                    user_id=user_id,
-                    status="active",
-                    plan_id="MONTHLY_100",
-                    payment_id=payment_id,
-                    created_at=datetime.now(timezone.utc).isoformat(),
-                    next_billing_date=next_billing.isoformat()
-                )
+                subscription_doc = {
+                    "user_id": user_id,
+                    "status": "active",
+                    "plan_id": "MONTHLY_100",
+                    "payment_id": payment_id,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "next_billing_date": next_billing.isoformat()
+                }
                 
-                session.add(subscription_doc)
-                
-                # Delete pending preference
-                await session.delete(pending)
-                await session.commit()
+                await db.subscriptions.insert_one(subscription_doc)
+                await db.pending_preferences.delete_one({"external_reference": external_reference})
                 
                 # Send confirmation email
                 email_html = f"""
                 <h2>Bem-vindo ao Aviator Analytics Pro</h2>
-                <p>Olá {pending.name},</p>
+                <p>Olá {pending['name']},</p>
                 <p>Sua assinatura foi confirmada com sucesso!</p>
-                <p><strong>Email:</strong> {pending.email}<br>
+                <p><strong>Email:</strong> {pending['email']}<br>
                 <strong>Senha temporária:</strong> {password}</p>
                 <p>Acesse o dashboard: <a href="{FRONTEND_URL}/login">{FRONTEND_URL}/login</a></p>
                 <p>Por favor, altere sua senha após o primeiro acesso.</p>
                 """
-                await send_email_async(pending.email, "Assinatura Confirmada - Aviator Analytics Pro", email_html)
+                await send_email_async(pending["email"], "Assinatura Confirmada - Aviator Analytics Pro", email_html)
     
     return {"status": "received"}
 
 @api_router.get("/subscription/check-status/{external_reference}")
-async def check_subscription_status(external_reference: str, session: AsyncSession = Depends(get_session)):
-    # Check for active user with subscription
-    result = await session.execute(
-        select(User).where(User.subscription_status == "active")
+async def check_subscription_status(external_reference: str):
+    user = await db.users.find_one(
+        {"subscription_status": "active"},
+        {"_id": 0}
     )
-    user = result.scalar_one_or_none()
     
     if user:
-        sub_result = await session.execute(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
-        subscription = sub_result.scalar_one_or_none()
+        subscription = await db.subscriptions.find_one({"user_id": user["id"]}, {"_id": 0})
         if subscription:
-            return {
-                "status": "active",
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "name": user.name,
-                    "subscription_status": user.subscription_status,
-                    "created_at": user.created_at
-                }
-            }
+            return {"status": "active", "user": user}
     
-    # Check for pending preference
-    pend_result = await session.execute(
-        select(PendingPreference).where(
-            PendingPreference.external_reference == external_reference
-        )
+    pending = await db.pending_preferences.find_one(
+        {"external_reference": external_reference},
+        {"_id": 0}
     )
-    pending = pend_result.scalar_one_or_none()
     
     if pending:
         return {"status": "pending"}
@@ -525,18 +425,6 @@ async def get_period_metrics(period: str = "day", user = Depends(get_current_use
     
     return {"period": period, "metrics": metrics}
 
-# Initialize database on startup
-@app.on_event("startup")
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    logging.info("Database initialized")
-
-@app.on_event("shutdown")
-async def shutdown_db():
-    await engine.dispose()
-    logging.info("Database connection closed")
-
 app.include_router(api_router)
 
 app.add_middleware(
@@ -552,3 +440,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()

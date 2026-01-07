@@ -69,7 +69,7 @@ The following environment variables are required:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | Database connection string | `sqlite+aiosqlite:///./data/app.db` |
+| `DATABASE_URL` | Database connection string | Auto-configured to `sqlite+aiosqlite:///<absolute-path>/backend/data/app.db` |
 | `JWT_SECRET` | Secret key for JWT token signing | **Must be changed in production** |
 | `MERCADO_PAGO_ACCESS_TOKEN` | Mercado Pago API access token | - |
 | `MERCADO_PAGO_WEBHOOK_SECRET` | Webhook signature verification secret | - |
@@ -80,10 +80,11 @@ The following environment variables are required:
 
 ### Database Configuration
 
-By default, the application uses SQLite with `sqlite+aiosqlite:///./data/app.db`. 
+By default, the application uses SQLite with an auto-configured absolute path: `backend/data/app.db`. 
 
 **Important Notes:**
-- SQLite data is stored locally in the `data/` directory
+- The database directory (`backend/data/`) is automatically created on startup if it doesn't exist
+- SQLite data is stored locally in the `backend/data/` directory
 - On Render's free tier, the filesystem is ephemeral - data will be lost on restart
 - For production with persistent data, use an external database (e.g., PostgreSQL):
   ```

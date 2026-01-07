@@ -22,17 +22,10 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # Database Configuration
-DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db')
-
-# Create data directory if using SQLite
-if 'sqlite' in DATABASE_URL:
-    # Extract the path from the DATABASE_URL
-    if ':///' in DATABASE_URL:
-        db_path = DATABASE_URL.split(':///', 1)[1]
-        if db_path.startswith('./'):
-            db_path = db_path[2:]
-        db_dir = ROOT_DIR / Path(db_path).parent
-        db_dir.mkdir(parents=True, exist_ok=True)
+# Default to absolute path for SQLite database
+_default_db_path = ROOT_DIR / 'data' / 'app.db'
+_default_db_url = f'sqlite+aiosqlite:///{_default_db_path}'
+DATABASE_URL = os.environ.get('DATABASE_URL', _default_db_url)
 
 # Create async engine
 engine = create_async_engine(
@@ -73,6 +66,15 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Ensure data directory exists for SQLite
+    if 'sqlite' in DATABASE_URL.lower():
+        # Extract path from DATABASE_URL (format: sqlite+aiosqlite:///path/to/db.db)
+        if ':///' in DATABASE_URL:
+            db_path = Path(DATABASE_URL.split(':///', 1)[1])
+            db_dir = db_path.parent
+            db_dir.mkdir(parents=True, exist_ok=True)
+            logging.info(f"Ensured database directory exists: {db_dir}")
+    
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     logging.info("Database initialized")

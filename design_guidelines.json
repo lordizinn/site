@@ -1,0 +1,161 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "Aviator Analytics Pro",
+      "archetype": "Electric & Neon (Future, Speed, Disruption)",
+      "vibe": "Professional, High-Frequency Trading, Institutional Grade, Dark, Precise",
+      "core_values": ["Precision", "Speed", "Transparency", "Edge"]
+    },
+    "typography": {
+      "fonts": {
+        "heading": {
+          "family": "Unbounded",
+          "url": "https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700&display=swap",
+          "usage": "Hero titles, Section headers, Key metrics (Large)",
+          "weights": ["400", "600", "700"]
+        },
+        "body": {
+          "family": "Manrope",
+          "url": "https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&display=swap",
+          "usage": "Paragraphs, UI labels, Navigation",
+          "weights": ["400", "500"]
+        },
+        "mono": {
+          "family": "JetBrains Mono",
+          "url": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",
+          "usage": "Data tables, Live tickers, Multipliers, Code snippets",
+          "weights": ["400", "700"]
+        }
+      },
+      "rules": [
+        "Headings > 32px must use tracking-tight (-0.02em)",
+        "All financial data and multipliers MUST use JetBrains Mono",
+        "Use uppercase + tracking-widest for small labels (e.g., 'LIVE STATUS')",
+        "Never use pure white text on black; use #EDEDED or #E1E1E1"
+      ]
+    },
+    "colors": {
+      "palette": {
+        "background": {
+          "default": "#050505",
+          "paper": "#0A0A0A",
+          "subtle": "#121212"
+        },
+        "primary": {
+          "main": "#00FF94",
+          "hover": "#00CC76",
+          "glow": "rgba(0, 255, 148, 0.5)"
+        },
+        "secondary": {
+          "main": "#00B8FF",
+          "dim": "rgba(0, 184, 255, 0.1)"
+        },
+        "status": {
+          "success": "#00FF94",
+          "error": "#FF3366",
+          "warning": "#FFD600",
+          "info": "#00B8FF"
+        },
+        "text": {
+          "primary": "#EDEDED",
+          "secondary": "#A1A1AA",
+          "muted": "#52525B"
+        },
+        "border": {
+          "default": "#1F1F22",
+          "active": "#27272A"
+        }
+      },
+      "gradients": {
+        "hero_glow": "radial-gradient(circle at 50% 50%, rgba(0, 255, 148, 0.15) 0%, rgba(5, 5, 5, 0) 70%)",
+        "card_surface": "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%)",
+        "neon_border": "linear-gradient(90deg, transparent, #00FF94, transparent)"
+      }
+    },
+    "layout": {
+      "spacing_scale": "Generous (2x standard)",
+      "container_padding": "p-6 md:p-12 lg:p-24",
+      "grid_systems": {
+        "dashboard": {
+          "name": "The Control Room",
+          "structure": "grid-cols-12 gap-4",
+          "rules": "Dense, no gaps > 16px, 100% height utilization"
+        },
+        "marketing": {
+          "name": "The Tetris Grid",
+          "structure": "grid-cols-1 md:grid-cols-12 gap-8",
+          "rules": "Asymmetrical spans, generous whitespace, overlapping elements"
+        }
+      }
+    },
+    "components": {
+      "buttons": {
+        "primary": "bg-[#00FF94] text-black font-bold hover:bg-[#00CC76] hover:shadow-[0_0_20px_rgba(0,255,148,0.4)] transition-all duration-300 rounded-sm uppercase tracking-wide",
+        "secondary": "bg-transparent border border-[#1F1F22] text-[#EDEDED] hover:border-[#00FF94] hover:text-[#00FF94] transition-all duration-300 rounded-sm uppercase tracking-wide",
+        "ghost": "text-[#A1A1AA] hover:text-[#EDEDED] hover:bg-white/5"
+      },
+      "cards": {
+        "style": "bg-[#0A0A0A] border border-[#1F1F22] rounded-sm backdrop-blur-sm",
+        "hover": "hover:border-[#27272A] transition-colors duration-300"
+      },
+      "inputs": {
+        "style": "bg-[#050505] border border-[#1F1F22] focus:border-[#00FF94] focus:ring-1 focus:ring-[#00FF94] rounded-sm text-[#EDEDED] placeholder:text-[#52525B]"
+      }
+    },
+    "visual_enhancers": {
+      "effects": [
+        "Scanlines: repeating-linear-gradient(0deg, transparent, transparent 2px, #000000 3px)",
+        "Glow: box-shadow: 0 0 15px var(--primary-glow)",
+        "Noise: url('/noise.png') opacity-5 mix-blend-overlay"
+      ],
+      "borders": "1px solid rgba(255,255,255,0.08)",
+      "glass": "backdrop-blur-xl bg-black/40 border border-white/10"
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_background": {
+        "url": "https://images.unsplash.com/photo-1764258559619-9d7dde5f7a47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRpZ2l0YWwlMjBkYXRhJTIwc3RyZWFtJTIwbmVvbiUyMGdyZWVuJTIwYmxhY2slMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc2Nzc5ODYwNXww&ixlib=rb-4.1.0&q=85",
+        "alt": "Abstract neon green data stream",
+        "usage": "Hero section background with heavy overlay"
+      },
+      "feature_chart": {
+        "url": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwyfHxmdXR1cmlzdGljJTIwZmluYW5jaWFsJTIwdHJhZGluZyUyMGNoYXJ0JTIwZ3JhcGglMjBkYXJrJTIwbW9kZXxlbnwwfHx8fDE3Njc3OTg2MDh8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Futuristic trading chart",
+        "usage": "Features section, 'Advanced Analytics' block"
+      },
+      "data_texture": {
+        "url": "https://images.unsplash.com/photo-1767477665641-d36584e26267?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRpZ2l0YWwlMjBkYXRhJTIwc3RyZWFtJTIwbmVvbiUyMGdyZWVuJTIwYmxhY2slMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc2Nzc5ODYwNXww&ixlib=rb-4.1.0&q=85",
+        "alt": "Plasma synthesis texture",
+        "usage": "Subtle background for pricing or testimonials"
+      },
+      "terminal_closeup": {
+        "url": "https://images.unsplash.com/photo-1642751226315-e6dc6b47fd54?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwzfHxmdXR1cmlzdGljJTIwZmluYW5jaWFsJTIwdHJhZGluZyUyMGNoYXJ0JTIwZ3JhcGglMjBkYXJrJTIwbW9kZXxlbnwwfHx8fDE3Njc3OTg2MDh8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Close up of data numbers",
+        "usage": "Login page background or 'Real-time Data' feature"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px, size 20px or 24px"
+    }
+  },
+  "implementation_guide": {
+    "steps": [
+      "1. SETUP: Install fonts (Unbounded, Manrope, JetBrains Mono) in index.css",
+      "2. THEME: Update tailwind.config.js with the specific neon palette (primary: #00FF94)",
+      "3. GLOBAL: Apply dark mode by default in index.html/body (class='dark bg-[#050505]')",
+      "4. COMPONENTS: Customize Shadcn components. Remove rounded-md, use rounded-sm. Remove white backgrounds, use #0A0A0A.",
+      "5. LAYOUT: Build the Dashboard Shell (Sidebar + Topbar + Main Content Area).",
+      "6. PAGES: Implement Landing Page with 'Tetris Grid' and Hero Glow.",
+      "7. CHARTS: Implement Recharts with custom dark tooltips and neon lines."
+    ],
+    "universal_rules": [
+      "DO NOT use gradients for text unless it's a very subtle title effect.",
+      "DO NOT use rounded-xl or rounded-2xl. Keep it sharp (rounded-sm or rounded-none).",
+      "ALWAYS use 'JetBrains Mono' for numbers displayed in the dashboard.",
+      "Ensure all interactive elements have hover states (brightness-110 or border color change).",
+      "Use 'sonner' for all notifications (success/error alerts)."
+    ]
+  }
+}

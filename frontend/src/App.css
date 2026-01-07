@@ -1,0 +1,24 @@
+.App {
+  min-height: 100vh;
+  background-color: #050505;
+}
+
+.App-header {
+  background-color: #050505;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: #EDEDED;
+}
+
+.App-link {
+  color: #00FF94;
+  text-decoration: none;
+}
+
+.App-link:hover {
+  opacity: 0.8;
+}

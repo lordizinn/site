@@ -1,0 +1,36 @@
+services:
+  # Full-stack service (Backend API + Frontend)
+  - type: web
+    name: aviator-analytics-api
+    runtime: python
+    plan: free
+    buildCommand: |
+      # Install backend dependencies
+      pip install -r backend/requirements.txt
+      # Build frontend (Render has Node.js pre-installed)
+      cd frontend
+      yarn install --frozen-lockfile
+      yarn build
+      cd ..
+    startCommand: uvicorn backend.server:app --host 0.0.0.0 --port 10000
+    envVars:
+      # DATABASE_URL is auto-configured to use absolute path in backend/data/
+      # Uncomment below to use external database (e.g., PostgreSQL)
+      # - key: DATABASE_URL
+      #   value: postgresql+asyncpg://user:password@host:port/dbname
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MERCADO_PAGO_ACCESS_TOKEN
+        sync: false
+      - key: MERCADO_PAGO_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        value: onboarding@resend.dev
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+    healthCheckPath: /health
+    autoDeploy: true
